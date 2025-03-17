@@ -8,10 +8,25 @@ let centreX = 0;
 let centreY = 0;
 
 const charges = [
-    { x: 0, y: 0, q: 1, vx: 0.1, vy: 0 },
-    { x: 0, y: -0.5, q: -1, vx: -0.1, vy: 0 },
-]
+    {
+        position: [0.5, 0],
+        velocity: [0, 0.5],
+        q: 1
+    },
 
+    {
+        position: [-0.5, 0],
+        velocity: [0, -0.5],
+        q: -1    
+    },
+
+    {
+        position: [0, 0],
+        velocity: [0, 0],
+        q: 0.04
+    },
+
+]
 
 function drawGridLines(ctx, canvasWidth, canvasHeight, centreX, centreY, scaleFactor) {
     ctx.save();
@@ -67,8 +82,8 @@ function drawCharges() {
     charges.forEach(charge => {
         ctx.beginPath();
         const radius = 0.03;
-        ctx.arc(charge.x, charge.y, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = charge.q > 0 ? 'red' : 'blue';
+        ctx.arc(charge.position[0], charge.position[1], radius, 0, 2 * Math.PI);
+        ctx.fillStyle = charge.q > 0 ? 'red' : '#2aacdf';
         ctx.fill();
     });
     ctx.restore();
@@ -76,28 +91,33 @@ function drawCharges() {
 
 function normalize({x1, y1}){
     const magnitude = Math.sqrt(x1**2 + y1**2);
-    return {x: x1/magnitude, y: y1/magnitude};
+    return [ x1/magnitude, y1/magnitude ];
+}
+
+function eval_force(charge1, charge2){
+    const dst = math.distance(charge1.position, charge2.position);
+    const force = charge1.q * charge2.q / dst**2;
+    let direction = math.subtract(charge1.position, charge2.position);
+    direction = normalize({x1: direction[0], y1: direction[1]});
+    return math.multiply(direction, force * 0.5);
 }
 
 function tick_simulation(dt) {
     charges.forEach(charge => {
-        charge.x += charge.vx * dt;
-        charge.y += charge.vy * dt;
+        charge.position = math.add(charge.position, math.multiply(charge.velocity, dt));
     });
 
-
-    const dst = Math.sqrt((charges[0].x - charges[1].x)**2 + (charges[0].y - charges[1].y)**2);
-
-    const force = charges[0].q * charges[1].q / dst**2;
-
-    const direction = normalize({x1: charges[1].x - charges[0].x, y1: charges[1].y - charges[0].y});
-
-    charges[0].vx -= (direction.x * force)/100 * dt;
-    charges[0].vy -= (direction.y * force)/100 * dt; 
-
-    charges[1].vx += (direction.x * force)/100 * dt;
-    charges[1].vy += (direction.y * force)/100 * dt;
-
+    console.log(charges);
+    charges.forEach(charge1 => {
+        let force = [0, 0];
+        charges.forEach(charge2 => {
+            if(charge1 !== charge2){
+                force = math.add(force, eval_force(charge1, charge2))
+            }
+        });
+        charge1.velocity = math.add(charge1.velocity, math.multiply(force, dt));
+    });
+                
 }
 
 let previousTime = Date.now();
@@ -119,6 +139,7 @@ function update() {
 // zoom mouse wheel
 canvas.addEventListener('wheel', (e) => {
 // zoom around the mouse coordinates
+    e.preventDefault(); 
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const previousScale = scaleFactor; // Store the previous scale
     scaleFactor *= zoomFactor;
@@ -157,6 +178,12 @@ canvas.addEventListener('mousemove', (e) => {
         centreY += dy;
         drawCharges();
     }
+});
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    drawCharges();
 });
 
 window.requestAnimationFrame(update);
